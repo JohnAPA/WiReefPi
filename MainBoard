@@ -21,8 +21,8 @@
 
 
 //Wifi Credentials --------------------------------------
-const char* ssid = "Cube Capsule";
-const char* password = "Wendover1";
+const char* ssid = "";
+const char* password = "";
 
 
 /**********---Constants---**********/
