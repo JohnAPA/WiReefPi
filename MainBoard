@@ -11,7 +11,8 @@
 //  D8: GPIO 8 - Connected to Connection LED 
 //-------
 //--MQTT Topics
-// room/LED - On/Off Triggers D7 LED to turn on/off
+// room/LED - On/Off Triggers D7 LED to turn on/off 
+// -----(later to be water pump instead of LED)
 //
 
 /**********---| Libraries |---**********/
@@ -42,11 +43,11 @@ OneWire oneWire(oneWireBus);
 DallasTemperature sensors(&oneWire);
 
 ////--| Wifi Login |---------
-const char* ssid = "***";
-const char* password = "****";
+const char* ssid = "***";  //Add your Network
+const char* password = "****";  //Add your Password to Network
 
 ////--| MQTT IP Address - Raspberry Pi IP Address |---------
-const char* mqtt_server = "192.168.1.***";
+const char* mqtt_server = "192.168.1.***";  //Add your rPi IP
 
 
 ////--| Names itself espClient |---------
@@ -84,7 +85,7 @@ void setup_wifi() {
 
 //-----/********|--MQTT RECEIVER--|**********/-----//
 ////--| MQTT Action from Message on a Subscription |---------
-
+//
 void callback(String topic, byte* message, unsigned int length) {
   Serial.print("Message arrived on topic: ");
   Serial.print(topic);
@@ -101,8 +102,11 @@ void callback(String topic, byte* message, unsigned int length) {
 
 // MQTT- LED Receiver with Action
 //---------------------------------------------------------------------
-// If a message is received on topic "room/LED" it checks if it says 
+//
+//  If a message is received on topic "room/LED" it checks if it says 
 // "on" or "off", this then turns the LED GPIO according to the message.
+// Later- LED will not be the source, but instead a water pump. 
+// 
   if(topic=="room/LED"){
       Serial.print("Changing Room LED to ");
       if(messageTemp == "on"){
@@ -254,9 +258,9 @@ void loop() {
 
 /**********--------| MQTT Publishing |---------**********/
 /**********--------|-----------------|---------**********/
-    client.publish("room/DHTemperature", temperatureTemp);
-    client.publish("room/humidity", humidityTemp);
-    client.publish("room/OWTemp", temperatureF);
+    client.publish("room/DHTemperature", temperatureTemp);  //This Works
+    client.publish("room/humidity", humidityTemp);          //This Works
+    client.publish("room/OWTemp", temperatureF);        //This Doesn't Work
 
 
 
