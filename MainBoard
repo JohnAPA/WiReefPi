@@ -250,7 +250,7 @@ void loop() {
     Serial.print(" ºF| OWT: ");
       Serial.print(temperatureF);
       Serial.print("  ºF");
-    Serial.println("-----");
+    Serial.println("");
 
 /**********--------| MQTT Publishing |---------**********/
 /**********--------|-----------------|---------**********/
