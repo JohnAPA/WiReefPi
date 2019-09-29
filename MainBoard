@@ -254,12 +254,14 @@ void loop() {
     Serial.print(" ºF| OWT: ");
       Serial.print(temperatureF);
       Serial.print("  ºF");
-    Serial.println("-----");
 
 /**********--------| MQTT Publishing |---------**********/
 /**********--------|-----------------|---------**********/
     client.publish("room/DHTemperature", temperatureTemp);
     client.publish("room/humidity", humidityTemp);
+
+
+
 
 /**********--------| Display Print |---------**********/
   display.clearDisplay();
