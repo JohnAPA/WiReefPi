@@ -260,9 +260,6 @@ void loop() {
 /**********--------|-----------------|---------**********/
     client.publish("room/DHTemperature", temperatureTemp);
     client.publish("room/humidity", humidityTemp);
-    client.publish("room/owtemp", temperatureF);
-
-
 
 /**********--------| Display Print |---------**********/
   display.clearDisplay();
