@@ -1,4 +1,4 @@
-
+//* -----------------| Master File |-------------------*//
 //--ESP8266
 //--DHT 11 | Status LED | OLED 0.96 SD1306 | OneWire | MQTT |
 //--------
@@ -11,9 +11,10 @@
 //  D8: GPIO 8 - Connected to Connection LED 
 //-------
 //--MQTT Topics
-// room/LED - On/Off Triggers D7 LED to turn on/off 
-// -----(later to be water pump instead of LED)
+// room/LED - On/Off Triggers D7 LED to turn on/off
 //
+
+//* -----------------||-------------------*//
 
 /**********---| Libraries |---**********/
 #include <ESP8266WiFi.h>
@@ -43,11 +44,11 @@ OneWire oneWire(oneWireBus);
 DallasTemperature sensors(&oneWire);
 
 ////--| Wifi Login |---------
-const char* ssid = "***";  //Add your Network
-const char* password = "****";  //Add your Password to Network
+const char* ssid = "Cube Capsule";
+const char* password = "Wendover1";
 
 ////--| MQTT IP Address - Raspberry Pi IP Address |---------
-const char* mqtt_server = "192.168.1.***";  //Add your rPi IP
+const char* mqtt_server = "192.168.1.248";
 
 
 ////--| Names itself espClient |---------
@@ -55,9 +56,9 @@ const char* mqtt_server = "192.168.1.***";  //Add your rPi IP
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-const int DHTPin = 2;      // DHT Sensor
-const int statusLED = 15; //Connection LED
-const int LED = 13;        //LED
+const int DHTPin = 2;     // DHT Sensor is connected to D4 so GPIO2
+const int statusLED = 15; //Connection LED is connected to D8 so GPIO 15
+const int LED = 13;       //LED is connected to D7 so GPIO1 13
 
 ////--| Initialize DHT |---------
 DHT dht(DHTPin, DHTTYPE);
@@ -85,7 +86,9 @@ void setup_wifi() {
 
 //-----/********|--MQTT RECEIVER--|**********/-----//
 ////--| MQTT Action from Message on a Subscription |---------
-//
+// This functions is executed when some device publishes a message to a topic that your ESP8266 is subscribed to
+// Change the function below to add logic to your program, so when a device publishes a message to a topic that 
+// your ESP8266 is subscribed you can actually do something
 void callback(String topic, byte* message, unsigned int length) {
   Serial.print("Message arrived on topic: ");
   Serial.print(topic);
@@ -102,11 +105,8 @@ void callback(String topic, byte* message, unsigned int length) {
 
 // MQTT- LED Receiver with Action
 //---------------------------------------------------------------------
-//
-//  If a message is received on topic "room/LED" it checks if it says 
-// "on" or "off", this then turns the LED GPIO according to the message.
-// Later- LED will not be the source, but instead a water pump. 
-// 
+// If a message is received on topic “room/LED” it checks if it says 
+// “on” or “off”, this then turns the LED GPIO according to the message.
   if(topic=="room/LED"){
       Serial.print("Changing Room LED to ");
       if(messageTemp == "on"){
@@ -254,13 +254,13 @@ void loop() {
     Serial.print(" ºF| OWT: ");
       Serial.print(temperatureF);
       Serial.print("  ºF");
-    Serial.println("");
+    Serial.println("-----");
 
 /**********--------| MQTT Publishing |---------**********/
 /**********--------|-----------------|---------**********/
-    client.publish("room/DHTemperature", temperatureTemp);  //This Works
-    client.publish("room/humidity", humidityTemp);          //This Works
-    client.publish("room/OWTemp", temperatureF);        //This Doesn't Work
+    client.publish("room/DHTemperature", temperatureTemp);
+    client.publish("room/humidity", humidityTemp);
+    client.publish("room/owtemp", temperatureF);
 
 
 
