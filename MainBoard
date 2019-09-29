@@ -1,6 +1,5 @@
 
 
-
 /**********Include Libraries**********/
 /*************************************/
 #include <ESP8266WiFi.h>        //For WiFi
