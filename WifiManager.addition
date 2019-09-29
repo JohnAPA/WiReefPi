@@ -10,13 +10,30 @@
 //  D7: GPIO 13- Connected to On/Off LED
 //  D8: GPIO 8 - Connected to Connection LED 
 //-------
+
 //--MQTT Topics
 // room/LED - On/Off Triggers D7 LED to turn on/off 
 // -----(later to be water pump instead of LED)
-//
+
+//--Float Names
+//temperatureC= onewire float name for def. C the probe receives
+//temperatureF= onewire float name for deg. F the probe receives
+//h = DHT float name value for humidity the sensor receives
+//t = DHT float name value for temperature (F) the sensor receives after humidity factored
+//f = DHT float name value for temperature (F) absolute value the sensor receives. 
 
 /**********---| Libraries |---**********/
+
+//WifiManager Libraries--------
+
 #include <ESP8266WiFi.h>
+#include <DNSServer.h>
+#include <ESP8266WebServer.h>
+#include <WiFiManager.h>
+//
+//-------------
+
+
 #include <Wire.h>
 #include <PubSubClient.h>
 #include "DHT.h"
@@ -42,9 +59,7 @@ const int oneWireBus = 0;     //Connected to D3 so GPIO 0
 OneWire oneWire(oneWireBus);
 DallasTemperature sensors(&oneWire);
 
-////--| Wifi Login |---------
-const char* ssid = "***";  //Add your Network
-const char* password = "****";  //Add your Password to Network
+
 
 ////--| MQTT IP Address - Raspberry Pi IP Address |---------
 const char* mqtt_server = "192.168.1.***";  //Add your rPi IP
@@ -66,22 +81,7 @@ DHT dht(DHTPin, DHTTYPE);
 long now = millis();
 long lastMeasure = 0;
 
-////--| Connects ESP8266 to router |---------
-void setup_wifi() {
-  delay(10);
-  // We start by connecting to a WiFi network
-  Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.print("WiFi connected - ESP IP address: ");
-  Serial.println(WiFi.localIP());
-}
+
 
 //-----/********|--MQTT RECEIVER--|**********/-----//
 ////--| MQTT Action from Message on a Subscription |---------
@@ -160,19 +160,26 @@ void reconnect() {
 }
 
 //-----/********|--VOID SETUP--|**********/-----//
+
 void setup() {
 
 //OLED Setup
 if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("SSD1306 allocation failed"));
     for(;;);
-}
+    }
+
+WiFiManager wifiManager;
+wifiManager.autoConnect("AutoConnectAP");
+Serial.println("connected...yeey :)");
+
 
   delay(5000);
   display.clearDisplay();
   display.setTextColor(WHITE);
   display.setTextSize(1);
   
+
   pinMode(LED, OUTPUT);
   pinMode(statusLED, OUTPUT);
   
@@ -182,7 +189,7 @@ if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
   dht.begin();
   
   Serial.begin(115200);
-  setup_wifi();
+  //setup_wifi();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 
@@ -238,6 +245,13 @@ void loop() {
     ////--| DHT Value |---------
     static char humidityTemp[7];
     dtostrf(h, 6, 2, humidityTemp);
+  
+
+/**********--------| MQTT Publishing |---------**********/
+/**********--------|-----------------|---------**********/
+    client.publish("room/DHTemperature", temperatureTemp);  //This Works
+    client.publish("room/humidity", humidityTemp);          //This Works
+    //client.publish("room/OWTemp", temperatureF);        //This Doesn't Work
 
 
 /**********--------|  Print |---------**********/   
@@ -255,12 +269,6 @@ void loop() {
       Serial.print(temperatureF);
       Serial.print("  ºF");
     Serial.println("");
-
-/**********--------| MQTT Publishing |---------**********/
-/**********--------|-----------------|---------**********/
-    client.publish("room/DHTemperature", temperatureTemp);  //This Works
-    client.publish("room/humidity", humidityTemp);          //This Works
-    client.publish("room/OWTemp", temperatureF);        //This Doesn't Work
 
 
 
