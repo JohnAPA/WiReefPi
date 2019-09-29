@@ -1,31 +1,4 @@
 
-/**********Include Libraries**********/
-/*************************************/
-#include <ESP8266WiFi.h>        //For WiFi
-#include <DNSServer.h>         //For WiFiManager
-#include <ESP8266WebServer.h>   //For WiFiManager
-#include <WiFiManager.h>        //For WiFiManager
-#include <Wire.h>               //For 
-#include <PubSubClient.h>       //For MQTT
-#include "DHT.h"                //For Temp/Hum sensor
-/*************************************************/
-
-/**********---Definitions---**********/
-
-#define DHTTYPE    DHT11     // DHT 11
-
-
-
-/**********---Constants---**********/
-
-// Raspberry Pi IP address, so it connects to your MQTT broker
-const char* mqtt_server = "192.168.1.248";
-
-
-// Initialize espClient. 
-//-------------------------------------------------------------------
-//Change the espClient name if there are multiple ESPs running.
-
 WiFiClient espClient;
 PubSubClient client(espClient);
 
