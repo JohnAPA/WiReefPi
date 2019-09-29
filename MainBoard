@@ -1,4 +1,72 @@
 
+//--ESP8266
+//--DHT 11 | Status LED | OLED 0.96 SD1306 | OneWire | MQTT |
+//--------
+//--Inputs
+//  D1: GPIO 5 - Connected to SCL of OLED 
+//  D2: GPIO 4 - Connected to SDA of OLED
+//  D3: GPIO 0 - Connected to Temperature Probe
+//  D4: GPIO 2 - Connected to DHT11
+//  D7: GPIO 13- Connected to On/Off LED
+//  D8: GPIO 8 - Connected to Connection LED 
+//-------
+
+//--MQTT Topics
+// room/LED - On/Off Triggers D7 LED to turn on/off 
+// -----(later to be water pump instead of LED)
+
+//--Float Names
+//temperatureC= onewire float name for def. C the probe receives
+//temperatureF= onewire float name for deg. F the probe receives
+//h = DHT float name value for humidity the sensor receives
+//t = DHT float name value for temperature (F) the sensor receives after humidity factored
+//f = DHT float name value for temperature (F) absolute value the sensor receives. 
+
+/**********---| Libraries |---**********/
+
+//WifiManager Libraries--------
+
+#include <ESP8266WiFi.h>
+#include <DNSServer.h>
+#include <ESP8266WebServer.h>
+#include <WiFiManager.h>
+//
+//-------------
+
+
+#include <Wire.h>
+#include <PubSubClient.h>
+#include "DHT.h"
+#include <Adafruit_SSD1306.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+/**********--------| Definitions |---------**********/
+
+////--| OLED |---------
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+////--| DHT |---------
+#define DHTTYPE    DHT11
+
+////--| OneWire |---------
+const int oneWireBus = 0;     //Connected to D3 so GPIO 0
+OneWire oneWire(oneWireBus);
+DallasTemperature sensors(&oneWire);
+
+
+
+////--| MQTT IP Address - Raspberry Pi IP Address |---------
+const char* mqtt_server = "192.168.1.***";  //Add your rPi IP
+
+
+////--| Names itself espClient |---------
+//-----Can be changed uniquely if multipe ESPs--////
 WiFiClient espClient;
 PubSubClient client(espClient);
 
