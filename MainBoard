@@ -12,7 +12,13 @@
 //-------
 //--MQTT Topics
 // room/LED - On/Off Triggers D7 LED to turn on/off
-//
+//outTopic - ESP Speaking
+//inTopic - ESP Listening
+//OWTemp - Onewire Temperature 
+// - Room/Humidity
+// - Room/DHTemperature
+
+
 
 //* -----------------||-------------------*//
 
@@ -32,8 +38,22 @@
 ////--| OLED |---------
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
+
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+////--| Names itself espClient |---------
+//-----Can be changed uniquely if multipe ESPs--////
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+
+////--| Wifi Login |---------
+const char* ssid = "*****";
+const char* password = "*****";
+
+////--| MQTT IP Address - Raspberry Pi IP Address |---------
+const char* mqtt_server = "***.***.*.*.***";
 
 ////--| DHT |---------
 #define DHTTYPE    DHT11
@@ -42,19 +62,6 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 const int oneWireBus = 0;     //Connected to D3 so GPIO 0
 OneWire oneWire(oneWireBus);
 DallasTemperature sensors(&oneWire);
-
-////--| Wifi Login |---------
-const char* ssid = "Cube Capsule";
-const char* password = "Wendover1";
-
-////--| MQTT IP Address - Raspberry Pi IP Address |---------
-const char* mqtt_server = "192.168.1.248";
-
-
-////--| Names itself espClient |---------
-//-----Can be changed uniquely if multipe ESPs--////
-WiFiClient espClient;
-PubSubClient client(espClient);
 
 const int DHTPin = 2;     // DHT Sensor is connected to D4 so GPIO2
 const int statusLED = 15; //Connection LED is connected to D8 so GPIO 15
@@ -79,6 +86,9 @@ void setup_wifi() {
     delay(500);
     Serial.print(".");
   }
+
+  randomSeed(micros());
+  
   Serial.println("");
   Serial.print("WiFi connected - ESP IP address: ");
   Serial.println(WiFi.localIP());
@@ -89,17 +99,21 @@ void setup_wifi() {
 // This functions is executed when some device publishes a message to a topic that your ESP8266 is subscribed to
 // Change the function below to add logic to your program, so when a device publishes a message to a topic that 
 // your ESP8266 is subscribed you can actually do something
-void callback(String topic, byte* message, unsigned int length) {
+
+void callback(char* topic, byte* message, unsigned int length) {
+ String messageTemp;
+  
   Serial.print("Message arrived on topic: ");
   Serial.print(topic);
   Serial.print(". Message: ");
-  String messageTemp;
-  
   for (int i = 0; i < length; i++) {
     Serial.print((char)message[i]);
     messageTemp += (char)message[i];
   }
   Serial.println();
+
+
+  
 
 
 
@@ -125,30 +139,30 @@ void callback(String topic, byte* message, unsigned int length) {
 //---------------------------------------------------------------------
 // This functions reconnects your ESP8266 to your MQTT broker
 // Change the function below if you want to subscribe to more topics with your ESP8266 
+
 void reconnect() {
   // Loop until we're reconnected
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
-    // Attempt to connect
-    /*
-     YOU MIGHT NEED TO CHANGE THIS LINE, IF YOU'RE HAVING PROBLEMS WITH MQTT MULTIPLE CONNECTIONS
-     To change the ESP device ID, you will have to give a new name to the ESP8266.
-     Here's how it looks:
-       if (client.connect("ESP8266Client")) {
-     You can do it like this:
-       if (client.connect("ESP1_Office")) {
-     Then, for the other ESP:
-       if (client.connect("ESP2_Garage")) {
-      That should solve your MQTT multiple connections problem
-    */
-    if (client.connect("ESP8266Client")) {
-      Serial.println("connected to MQTT");  
+                    // Attempt to connect
+
+// Create a random client ID
+    String clientId = "ESP8266Client-";
+    clientId += String(random(0xffff), HEX);
+    
+// Attempt to connect
+    if (client.connect(clientId.c_str())) {
+      Serial.println("connected to MQTT");
+            
+      client.publish("outTopic", "hello world");  // Once connected, publish an announcement...
+      client.subscribe("inTopic");
 
   ////--| ESP Subscribe to topic room/LED |---------   
       // Subscribe or resubscribe to a topic
       // You can subscribe to more topics (to control more LEDs)
       client.subscribe("room/LED");
       Serial.println("Subscribed to topic: room/LED");
+      client.publish("room/message", "I'm subscribed to room/LED and ready to turn on and off the light.");
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -195,11 +209,10 @@ if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
 void loop() {
 
   if (!client.connected()) {
-    digitalWrite(statusLED, HIGH);
     reconnect();
-  }
-  if(!client.loop())
-    client.connect("ESP8266Client");
+                }
+  client.loop();
+
 
   now = millis();
 
@@ -218,6 +231,7 @@ void loop() {
   sensors.requestTemperatures(); 
   float temperatureC = sensors.getTempCByIndex(0);
   float temperatureF = sensors.getTempFByIndex(0);
+
   delay(5000);
 
     // Check if any reads failed and exit early (to try again).
@@ -239,27 +253,33 @@ void loop() {
     static char humidityTemp[7];
     dtostrf(h, 6, 2, humidityTemp);
 
+    static char OwTemp[7];
+    dtostrf(temperatureF, 6, 2, OwTemp);
+
 
 /**********--------|  Print |---------**********/   
+    
+    Serial.print("Topic: room/humidity: ");
     Serial.print("Humidity: ");
     Serial.print(h);
-    Serial.print(" %| DHT-T ");
-    //Serial.print(t);
-    //Serial.print(" *C ");
+      client.publish("room/humidity", humidityTemp);
+    Serial.print("% | Topic: room/DHTemperature: ");
     Serial.print(f);
-    Serial.print(" ºF| Heat Index: ");
-    //Serial.print(hic);
-    //Serial.println(" *C ");
+      client.publish("room/DHTemperature", temperatureTemp);
+    Serial.print(" ºF | Heat Index: ");
     Serial.print(hif);
-    Serial.print(" ºF| OWT: ");
-      Serial.print(temperatureF);
-      Serial.print("  ºF");
-      Serial.print("");
+    Serial.print(" ºF | OneWire Temp: ");
+    Serial.print(temperatureF);
+      client.publish("room/OWTemp", OwTemp);
+    Serial.print("ºF | Topic: room/OWTemp ");
+    Serial.println("");
+
+        
 
 /**********--------| MQTT Publishing |---------**********/
 /**********--------|-----------------|---------**********/
-    client.publish("room/DHTemperature", temperatureTemp);
-    client.publish("room/humidity", humidityTemp);
+    
+    
 
 
 
@@ -289,6 +309,7 @@ void loop() {
   display.setCursor(0, 45);
   display.print(h);
   display.print(" %"); 
+ 
   
   display.display(); 
 
