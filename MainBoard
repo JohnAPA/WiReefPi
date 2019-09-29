@@ -70,29 +70,22 @@ const char* mqtt_server = "192.168.1.***";  //Add your rPi IP
 WiFiClient espClient;
 PubSubClient client(espClient);
 
+const int DHTPin = 2;      // DHT Sensor
+const int statusLED = 15; //Connection LED
+const int LED = 13;        //LED
 
-const int DHTPin = 2;        // DHT Sensor is connected to D4 so GPIO2
-const int statusLED = 15;   //Connection LED is connected to D8 so GPIO 15
-const int LED = 13;         // LED is connected to D7 so GPIO1 13
-
-// Initialize DHT sensor.
+////--| Initialize DHT |---------
 DHT dht(DHTPin, DHTTYPE);
 
-
-//Timers--------------------------------------
+////--| Timer/Auxilar Var |---------
 long now = millis();
 long lastMeasure = 0;
 
 
 
-//Publishing and Functions - VOID CALLBACK 
-//-------------------------------------------------------------------
-// Executed when a device publishes a message to a topic that ESP8266 is subscribed to
-//****Change the function to add logic to the program, so when a devices publishes a 
-//message to a topic that the ESP8266 is subscribed to, something actually happens. 
-//Add more if statements to control more GPIO's with MQTT. 
-
-
+//-----/********|--MQTT RECEIVER--|**********/-----//
+////--| MQTT Action from Message on a Subscription |---------
+//
 void callback(String topic, byte* message, unsigned int length) {
   Serial.print("Message arrived on topic: ");
   Serial.print(topic);
@@ -107,12 +100,7 @@ void callback(String topic, byte* message, unsigned int length) {
 
 
 
-// Function - LED Changer
-//-------------------------------------------------------------------
-// If a message is received on the topic room/LED, it checks if it is on or off. 
-// Then turns the LED GPIO either on or off, depending on the message
-
-
+// MQTT- LED Receiver with Action
 //---------------------------------------------------------------------
 //
 //  If a message is received on topic "room/LED" it checks if it says 
