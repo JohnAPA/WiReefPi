@@ -1,64 +1,74 @@
+//--ESP8266
+//--DHT 11 | Status LED | OLED 0.96 SD1306 | OneWire | MQTT |
+//--------
+//--Inputs
+//  D1: GPIO 5 - Connected to SCL of OLED 
+//  D2: GPIO 4 - Connected to SDA of OLED
+//  D3: GPIO 0 - Connected to Temperature Probe
+//  D4: GPIO 2 - Connected to DHT11
+//  D7: GPIO 13- Connected to On/Off LED
+//  D8: GPIO 8 - Connected to Connection LED 
+//-------
+//--MQTT Topics
+// room/LED - On/Off Triggers D7 LED to turn on/off 
+// -----(later to be water pump instead of LED)
+//
+
+/**********---| Libraries |---**********/
+#include <ESP8266WiFi.h>
+#include <Wire.h>
+#include <PubSubClient.h>
+#include "DHT.h"
+#include <Adafruit_SSD1306.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+/**********--------| Definitions |---------**********/
+
+////--| OLED |---------
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+////--| DHT |---------
+#define DHTTYPE    DHT11
+
+////--| OneWire |---------
+const int oneWireBus = 0;     //Connected to D3 so GPIO 0
+OneWire oneWire(oneWireBus);
+DallasTemperature sensors(&oneWire);
+
+////--| Wifi Login |---------
+const char* ssid = "***";  //Add your Network
+const char* password = "****";  //Add your Password to Network
+
+////--| MQTT IP Address - Raspberry Pi IP Address |---------
+const char* mqtt_server = "192.168.1.***";  //Add your rPi IP
 
 
-
-/**********Include Libraries**********/
-/*************************************/
-#include <ESP8266WiFi.h>        //For WiFi
-#include <DNSServer.h>.         //For WiFiManager
-#include <ESP8266WebServer.h>   //For WiFiManager
-#include <WiFiManager.h>        //For WiFiManager
-#include <Wire.h>               //For 
-#include <PubSubClient.h>       //For MQTT
-#include "DHT.h"                //For Temp/Hum sensor
-/*************************************************/
-
-/**********---Definitions---**********/
-
-#define DHTTYPE    DHT11     // DHT 11
-
-/**************************************/
-
-
-
-//Wifi Credentials --------------------------------------
-const char* ssid = "";
-const char* password = "";
-
-
-/**********---Constants---**********/
-
-// Raspberry Pi IP address, so it connects to your MQTT broker
-const char* mqtt_server = "192.168.1.248";
-
-
-// Initialize espClient. 
-//-------------------------------------------------------------------
-//Change the espClient name if there are multiple ESPs running.
-
+////--| Names itself espClient |---------
+//-----Can be changed uniquely if multipe ESPs--////
 WiFiClient espClient;
 PubSubClient client(espClient);
 
+const int DHTPin = 2;      // DHT Sensor
+const int statusLED = 15; //Connection LED
+const int LED = 13;        //LED
 
-const int DHTPin = 2;        // DHT Sensor is connected to D4 so GPIO2
-const int statusLED = 15;   //Connection LED is connected to D8 so GPIO 15
-const int LED = 13;         // LED is connected to D7 so GPIO1 13
-
-// Initialize DHT sensor.
+////--| Initialize DHT |---------
 DHT dht(DHTPin, DHTTYPE);
 
-
-//Timers--------------------------------------
+////--| Timer/Auxilar Var |---------
 long now = millis();
 long lastMeasure = 0;
 
-
-// Connects your ESP8266 to router
-//------------------------------------------------------------------
-//Setup Wifi
-
+////--| Connects ESP8266 to router |---------
 void setup_wifi() {
   delay(10);
-
+  // We start by connecting to a WiFi network
   Serial.println();
   Serial.print("Connecting to ");
   Serial.println(ssid);
@@ -72,14 +82,9 @@ void setup_wifi() {
   Serial.println(WiFi.localIP());
 }
 
-//Publishing and Functions
-//-------------------------------------------------------------------
-// Executed when a device publishes a message to a topic that ESP8266 is subscribed to
-//****Change the function to add logic to the program, so when a devices publishes a 
-//message to a topic that the ESP8266 is subscribed to, something actually happens. 
-//Add more if statements to control more GPIO's with MQTT. 
-
-
+//-----/********|--MQTT RECEIVER--|**********/-----//
+////--| MQTT Action from Message on a Subscription |---------
+//
 void callback(String topic, byte* message, unsigned int length) {
   Serial.print("Message arrived on topic: ");
   Serial.print(topic);
@@ -94,12 +99,13 @@ void callback(String topic, byte* message, unsigned int length) {
 
 
 
-// Description
-//-------------------------------------------------------------------
-// If a message is received on the topic room/LED, it checks if it is on or off. 
-// Then turns the LED GPIO either on or off, depending on the message
-
-
+// MQTT- LED Receiver with Action
+//---------------------------------------------------------------------
+//
+//  If a message is received on topic "room/LED" it checks if it says 
+// "on" or "off", this then turns the LED GPIO according to the message.
+// Later- LED will not be the source, but instead a water pump. 
+// 
   if(topic=="room/LED"){
       Serial.print("Changing Room LED to ");
       if(messageTemp == "on"){
@@ -114,42 +120,58 @@ void callback(String topic, byte* message, unsigned int length) {
   Serial.println();
 }
 
-
-// Reconnects ESP8266 to the MQTT Broker
-//-------------------------------------------------------------------
-// Change this function if I want to subscribe to more topics with the ESP8266
-/*   May need to change if problems with multiple connections. 
-       if (client.connect("ESP1_Office")) {
-         Then, for the other ESP:
-        if (client.connect("ESP2_Garage")) {....and so forth
-*/
-
+//ESP to MQTT Reconnection and Subscription
+//---------------------------------------------------------------------
+// This functions reconnects your ESP8266 to your MQTT broker
+// Change the function below if you want to subscribe to more topics with your ESP8266 
 void reconnect() {
+  // Loop until we're reconnected
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
-
+    // Attempt to connect
+    /*
+     YOU MIGHT NEED TO CHANGE THIS LINE, IF YOU'RE HAVING PROBLEMS WITH MQTT MULTIPLE CONNECTIONS
+     To change the ESP device ID, you will have to give a new name to the ESP8266.
+     Here's how it looks:
+       if (client.connect("ESP8266Client")) {
+     You can do it like this:
+       if (client.connect("ESP1_Office")) {
+     Then, for the other ESP:
+       if (client.connect("ESP2_Garage")) {
+      That should solve your MQTT multiple connections problem
+    */
     if (client.connect("ESP8266Client")) {
-      Serial.println("connected");  // Subscribe or resubscribe to a topic
-      client.subscribe("room/LED"); // Cab subscribe to more topics (to control more LEDs if needed)
+      Serial.println("connected to MQTT");  
 
+  ////--| ESP Subscribe to topic room/LED |---------   
+      // Subscribe or resubscribe to a topic
+      // You can subscribe to more topics (to control more LEDs)
+      client.subscribe("room/LED");
+      Serial.println("Subscribed to topic: room/LED");
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
-     
-      delay(5000);  // Wait 5 seconds before retrying
+      // Wait 5 seconds before retrying
+      delay(5000);
     }
   }
 }
 
-
-
-
-//-----/**********--VOID SETUP--**********/-----//
-//**********************************************//
-
-
+//-----/********|--VOID SETUP--|**********/-----//
 void setup() {
+
+//OLED Setup
+if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for(;;);
+}
+
+  delay(5000);
+  display.clearDisplay();
+  display.setTextColor(WHITE);
+  display.setTextSize(1);
+  
   pinMode(LED, OUTPUT);
   pinMode(statusLED, OUTPUT);
   
@@ -159,25 +181,16 @@ void setup() {
   dht.begin();
   
   Serial.begin(115200);
+  setup_wifi();
+  client.setServer(mqtt_server, 1883);
+  client.setCallback(callback);
 
-  //setup_wifi();
-
-  client.setServer(mqtt_server, 1883);  //Sets the MQTT Broker
-  client.setCallback(callback);         //Callback is what receives messages that control the LEDs
-
-  WiFiManager wifiManager;
-  wifiManager.autoConnect("AutoConnectAP");
-  Serial.println("Connected to WiFi");
+////--| DHT Begin |---------
+    sensors.begin();
 
 }
 
-
-//-----/**********--VOID LOOP--**********/-----//
-//********************************************//
-    //  No need to change anything in loop. 
-    //  All loop will do is ensure that ESP is connected to the MQTT broker. 
-
-
+//-----/********|--VOID LOOP--|**********/-----//
 void loop() {
 
   if (!client.connected()) {
@@ -188,51 +201,95 @@ void loop() {
     client.connect("ESP8266Client");
 
   now = millis();
-  
-  if (now - lastMeasure > 30000) {  // Publishes new temperature and humidity every 30 seconds
+
+////--| Read Sensors every 30 seconds (they are 2 sec delayed) |---------
+  if (now - lastMeasure > 5000) { //30 seconds
     lastMeasure = now;
- 
+    
+    /**********--------| DHT Values |---------**********/
     float h = dht.readHumidity();
+    // Read temperature as Celsius (the default)
     float t = dht.readTemperature();
+    // Read temperature as Fahrenheit (isFahrenheit = true)
     float f = dht.readTemperature(true);
 
-    //Check if any sensors failed -----------------------------------------
-  if (isnan(h) || isnan(t) || isnan(f)) {
-     Serial.println("Failed to read from DHT sensor!");
-     return;
+/**********--------| OneWire Values |---------**********/
+  sensors.requestTemperatures(); 
+  float temperatureC = sensors.getTempCByIndex(0);
+  float temperatureF = sensors.getTempFByIndex(0);
+  delay(5000);
+
+    // Check if any reads failed and exit early (to try again).
+    if (isnan(h) || isnan(t) || isnan(f)) {
+      Serial.println("Failed to read from DHT sensor!");
+      return;
     }
-
-
-//Celsius Conversion ------------------------------------------------------
-    /*
-    //float hic = dht.computeHeatIndex(t, h, false);
-    //static char temperatureTemp[7];
-    //dtostrf(hic, 6, 2, temperatureTemp);
-    */
-
-    //Computes Farenheit --------------------------------------
+                //Computes temperature values in Celsius
+               //float hic = dht.computeHeatIndex(t, h, false);
+              //static char temperatureTemp[7];
+             //dtostrf(hic, 6, 2, temperatureTemp);
+    
+    ////--| DHT Temperature Value |---------
     float hif = dht.computeHeatIndex(f, h);
     static char temperatureTemp[7];
     dtostrf(hif, 6, 2, temperatureTemp);
     
+    ////--| DHT Value |---------
     static char humidityTemp[7];
     dtostrf(h, 6, 2, humidityTemp);
 
 
-    //Publish Temp and Humidity Values --------------------------------------
-    client.publish("room/temperature", temperatureTemp);
-    client.publish("room/humidity", humidityTemp);
-    
+/**********--------|  Print |---------**********/   
     Serial.print("Humidity: ");
     Serial.print(h);
-    Serial.print(" %\t Temperature: ");
+    Serial.print(" %| DHT-T ");
     //Serial.print(t);
     //Serial.print(" *C ");
     Serial.print(f);
-    Serial.print(" *F\t Heat index: ");
+    Serial.print(" ºF| Heat Index: ");
     //Serial.print(hic);
     //Serial.println(" *C ");
     Serial.print(hif);
-    Serial.println(" *F");
+    Serial.print(" ºF| OWT: ");
+      Serial.print(temperatureF);
+      Serial.print("  ºF");
+    Serial.println("");
+
+/**********--------| MQTT Publishing |---------**********/
+/**********--------|-----------------|---------**********/
+    client.publish("room/DHTemperature", temperatureTemp);  //This Works
+    client.publish("room/humidity", humidityTemp);          //This Works
+    client.publish("room/OWTemp", temperatureF);        //This Doesn't Work
+
+
+
+/**********--------| Display Print |---------**********/
+  display.clearDisplay();
+  
+////--| Display Temperature on OLED |---------
+  display.setTextSize(1);
+  display.setCursor(0,0);
+  display.print("Temperature: ");
+  display.setTextSize(2);
+  display.setCursor(0,10);
+  display.print(f);
+  display.print(" ");
+  display.setTextSize(1);
+  display.cp437(true);
+  display.write(167);
+  display.setTextSize(2);
+  display.print("F");
+  
+////--| Display Humidity on OLED |---------
+  display.setTextSize(1);
+  display.setCursor(0, 35);
+  display.print("Humidity: ");
+  display.setTextSize(2);
+  display.setCursor(0, 45);
+  display.print(h);
+  display.print(" %"); 
+  
+  display.display(); 
+
   }
 } 
