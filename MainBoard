@@ -1,37 +1,44 @@
 //* -----------------| Master File |-------------------*//
 //--ESP8266
-//--DHT 11 | Status LED | OLED 0.96 SD1306 | OneWire | MQTT |
-//--------
-//--Inputs
-//  D1: GPIO 5 - Connected to SCL of OLED 
-//  D2: GPIO 4 - Connected to SDA of OLED
-//  D3: GPIO 0 - Connected to Temperature Probe
-//  D4: GPIO 2 - Connected to DHT11
-//  D7: GPIO 13- Connected to On/Off LED
-//  D8: GPIO 8 - Connected to Connection LED 
+/*
+----ESP8266 | DHT 11 | Status LED | OLED 0.96 SD1306 | OneWire | MQTT |
+--
+  D1: GPIO 5 - Connected to SCL of OLED 
+  D2: GPIO 4 - Connected to SDA of OLED
+  D3: GPIO 0 - Connected to Temperature Probe
+  D4: GPIO 2 - Connected to DHT11
+  D7: GPIO 13- Connected to On/Off LED
+  D8: GPIO 8 - Connected to Connection LED 
+  
 //-------
-//--MQTT Topics
-// room/LED - On/Off Triggers D7 LED to turn on/off
-//outTopic - ESP Speaking
-//inTopic - ESP Listening
-//OWTemp - Onewire Temperature 
-// - Room/Humidity
-// - Room/DHTemperature
+MQTT Topics
+--
+  room/LED - On/Off Triggers D7 LED to turn on/off
+  outTopic - ESP Speaking
+  inTopic - ESP Listening
+  OWTemp - Onewire Temperature 
+  Room/Humidity
+  Room/DHTemperature
 
-
-
-//* -----------------||-------------------*//
+ */
 
 /**********---| Libraries |---**********/
-#include <ESP8266WiFi.h>
-#include <Wire.h>
-#include <PubSubClient.h>
-#include "DHT.h"
-#include <Adafruit_SSD1306.h>
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <OneWire.h>
-#include <DallasTemperature.h>
+#include <ESP8266WiFi.h>        //WiFi
+#include <Wire.h>               //WiFi
+#include <PubSubClient.h>       //MQTT
+
+#include "DHT.h"                //DHT Sensor               
+
+#include <Adafruit_SSD1306.h>   //OLED
+#include <Wire.h>               //OLED
+#include <Adafruit_GFX.h>       //OLED
+
+#include <OneWire.h>             //OneWire
+#include <DallasTemperature.h>   //Onewire
+    
+#include <ESP8266mDNS.h>        //--OTA 
+#include <WiFiUdp.h>            //--OTA 
+#include <ArduinoOTA.h>         //--OTA 
 
 /**********--------| Definitions |---------**********/
 
@@ -113,10 +120,6 @@ void callback(char* topic, byte* message, unsigned int length) {
   Serial.println();
 
 
-  
-
-
-
 // MQTT- LED Receiver with Action
 //---------------------------------------------------------------------
 // If a message is received on topic “room/LED” it checks if it says 
@@ -176,32 +179,60 @@ void reconnect() {
 //-----/********|--VOID SETUP--|**********/-----//
 void setup() {
 
-//OLED Setup
+  Serial.println("Booting");
+
+////--| OLED Display |---------
 if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("SSD1306 allocation failed"));
     for(;;);
 }
-
-  delay(5000);
-  display.clearDisplay();
-  display.setTextColor(WHITE);
-  display.setTextSize(1);
+    delay(5000);
+    display.clearDisplay();
+    display.setTextColor(WHITE);
+    display.setTextSize(1);
   
-  pinMode(LED, OUTPUT);
-  pinMode(statusLED, OUTPUT);
+  ////--| LED's |---------
+   pinMode(LED, OUTPUT);
+   pinMode(statusLED, OUTPUT);
   
-  digitalWrite(LED, LOW);
-  digitalWrite(statusLED, LOW);
+    digitalWrite(LED, LOW);
+   digitalWrite(statusLED, LOW);
   
   dht.begin();
   
   Serial.begin(115200);
+
   setup_wifi();
-  client.setServer(mqtt_server, 1883);
-  client.setCallback(callback);
+    client.setServer(mqtt_server, 1883);
+    client.setCallback(callback);
+
+
+////--| OTA Programming |---------
+
+  ArduinoOTA.onStart([]() {
+    Serial.println("Start");
+  });
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nEnd");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+  });
+  ArduinoOTA.begin();
+  Serial.println("Ready");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
 
 ////--| DHT Begin |---------
-    sensors.begin();
+  sensors.begin();
 
 }
 
@@ -275,14 +306,6 @@ void loop() {
     Serial.println("");
 
         
-
-/**********--------| MQTT Publishing |---------**********/
-/**********--------|-----------------|---------**********/
-    
-    
-
-
-
 
 /**********--------| Display Print |---------**********/
   display.clearDisplay();
