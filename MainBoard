@@ -1,5 +1,4 @@
 //* -----------------| Master File |-------------------*//
-//--ESP8266
 /*
 ----ESP8266 | DHT 11 | Status LED | OLED 0.96 SD1306 | OneWire | MQTT |
 --
