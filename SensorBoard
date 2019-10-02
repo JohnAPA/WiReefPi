@@ -1,6 +1,20 @@
 
-//-----/********|--ESP32 Sensor Board--|**********/-----//
+//* -----------------| ESP32-Sensor Board |-------------------*//
+//--ESP32
+//--pH Probe | Conductivity Probe | Light Sensor 1 | Light Sensor 2 | MQTT |
+//--------
+//--Inputs
+//  Left 5: GPIO36 Ax x - Connected to 
+//-------
+//--MQTT Topics
+// room/LED - On/Off Triggers D7 LED to turn on/off
+// outTopic - ESP Speaking
+// inTopic - ESP Listening
+// OWTemp - Onewire Temperature 
+// Room/Humidity
+// Room/DHTemperature
 
+////--|  |---------
 
 const int analogInPin =36; 
 int sensorValue = 0; 
