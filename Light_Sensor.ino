@@ -1,3 +1,12 @@
+//* -----------------| Light Sensor |-------------------*//
+//--Light Sensor | 
+//--------
+//--Inputs
+//  Left 5: GPIO36 Ax x - Connected to 
+
+////--|  |---------
+
+
 int sensorPin = 34; //needs to be changed or it will conflict with the pH Probe
 float rawRange = 4096;
 float logRange = 5.0;
