@@ -1,6 +1,6 @@
 //* -----------------| ESP8266-MainBoard |-------------------*//
 //--ESP8266
-//--DHT 11 | Status LED | OLED 0.96 SD1306 | OneWire | MQTT |
+//--DHT 11 (Temp/Humidity) | Status LED | OLED 0.96 SD1306 | OneWire | MQTT | 
 //--------
 //--Inputs
 //  D1: GPIO 5 - Connected to SCL of OLED 
