@@ -1,6 +1,6 @@
-//* -----------------| ESP8266-MainBoard |-------------------*//
+//* -----------------| Master File |-------------------*//
 //--ESP8266
-//--DHT 11 (Temp/Humidity) | Status LED | OLED 0.96 SD1306 | OneWire | MQTT | 
+//--DHT 11 | Status LED | OLED 0.96 SD1306 | OneWire | MQTT |
 //--------
 //--Inputs
 //  D1: GPIO 5 - Connected to SCL of OLED 
@@ -10,13 +10,21 @@
 //  D7: GPIO 13- Connected to On/Off LED
 //  D8: GPIO 8 - Connected to Connection LED 
 //-------
-//--MQTT Topics
-// room/LED - On/Off Triggers D7 LED to turn on/off
-//outTopic - ESP Speaking
-//inTopic - ESP Listening
-//OWTemp - Onewire Temperature 
-// - Room/Humidity
-// - Room/DHTemperature
+//  A0: Analog TDS Sensor 
+//-------
+//MQTT Topics
+// - room/LED - On/Off Triggers D7 LED to turn on/off
+// - esp8266/message - ESP Speaking
+// - esp8266/receiver - ESP Listening
+// - room/OWTemp - Onewire Temperature 
+// - room/humidity - DHT Sensor
+// - room/TDS - Conductivity Sensor !! doesn't work because I think i need to convert the number to a string but dont know how
+// - room/DHTemperature - DHT Temperature
+// - esp8266/dhtreadings - String JSON DHT Humidity and Temp for python db app.py
+// - esp8266/message - personal messages from esp8266
+// - esp8266/listener - listens for personal messages 
+//-------
+
 
 
 
@@ -47,16 +55,26 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-
 ////--| Wifi Login |---------
-const char* ssid = "*****";
-const char* password = "*****";
+const char* ssid = "***";
+const char* password = "***";
 
 ////--| MQTT IP Address - Raspberry Pi IP Address |---------
-const char* mqtt_server = "***.***.*.*.***";
+const char* mqtt_server = "***";
 
-////--| DHT |---------
+////--| Define DHT |---------
 #define DHTTYPE    DHT11
+
+////--| Define Conductivity Sensor |---------
+#define TdsSensorPin A0
+#define VREF 5.0      // analog reference voltage(Volt) of the ADC
+#define SCOUNT  30           // sum of sample point
+
+int analogBuffer[SCOUNT];    // store the analog value in the array, read from ADC
+int analogBufferTemp[SCOUNT];
+int analogBufferIndex = 0,copyIndex = 0;
+float averageVoltage = 0,tdsValue = 0,temperature = 25;
+
 
 ////--| OneWire |---------
 const int oneWireBus = 0;     //Connected to D3 so GPIO 0
@@ -73,6 +91,7 @@ DHT dht(DHTPin, DHTTYPE);
 ////--| Timer/Auxilar Var |---------
 long now = millis();
 long lastMeasure = 0;
+char data[80]; //allows JSON to work
 
 ////--| Connects ESP8266 to router |---------
 void setup_wifi() {
@@ -92,6 +111,7 @@ void setup_wifi() {
   Serial.println("");
   Serial.print("WiFi connected - ESP IP address: ");
   Serial.println(WiFi.localIP());
+  digitalWrite(statusLED, HIGH);
 }
 
 //-----/********|--MQTT RECEIVER--|**********/-----//
@@ -111,10 +131,6 @@ void callback(char* topic, byte* message, unsigned int length) {
     messageTemp += (char)message[i];
   }
   Serial.println();
-
-
-  
-
 
 
 // MQTT- LED Receiver with Action
@@ -146,77 +162,130 @@ void reconnect() {
     Serial.print("Attempting MQTT connection...");
                     // Attempt to connect
 
-// Create a random client ID
-    String clientId = "ESP8266Client-";
-    clientId += String(random(0xffff), HEX);
-    
-// Attempt to connect
-    if (client.connect(clientId.c_str())) {
-      Serial.println("connected to MQTT");
+   
+// Attempt to Connect
+  if (client.connect("ESP8266Client")) {
+  Serial.println("connected to MQTT");
             
-      client.publish("outTopic", "hello world");  // Once connected, publish an announcement...
-      client.subscribe("inTopic");
+  client.publish("esp8266/message", "hello world");  // Once connected, publish an announcement...
+  client.subscribe("esp8266/receiver");
 
-  ////--| ESP Subscribe to topic room/LED |---------   
-      // Subscribe or resubscribe to a topic
-      // You can subscribe to more topics (to control more LEDs)
-      client.subscribe("room/LED");
-      Serial.println("Subscribed to topic: room/LED");
-      client.publish("room/message", "I'm subscribed to room/LED and ready to turn on and off the light.");
+////--| ESP Subscribe to topic room/LED |---------   
+// Subscribe or resubscribe to a topic
+// You can subscribe to more topics (to control more LEDs)
+  client.subscribe("room/LED");
+  Serial.println("Subscribed to topic: room/LED");
+  client.publish("room/message", "I'm subscribed to room/LED and ready to turn on and off the light.");
+      
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
+      
       // Wait 5 seconds before retrying
       delay(5000);
     }
   }
-}
+  }
+
+// Calculate TDS Value --------------------------------------
+  int getMedianNum(int bArray[], int iFilterLen){
+  int bTab[iFilterLen];
+    for (byte i = 0; i<iFilterLen; i++)
+     bTab[i] = bArray[i];
+  int i, j, bTemp;
+    for (j = 0; j < iFilterLen - 1; j++) 
+        {
+    for (i = 0; i < iFilterLen - j - 1; i++) 
+          {
+     if (bTab[i] > bTab[i + 1]) 
+         {
+      bTemp = bTab[i];
+      bTab[i] = bTab[i + 1];
+      bTab[i + 1] = bTemp;
+         }
+         }
+         }
+     if ((iFilterLen & 1) > 0)
+       bTemp = bTab[(iFilterLen - 1) / 2];
+      else
+        bTemp = (bTab[iFilterLen / 2] + bTab[iFilterLen / 2 - 1]) / 2;
+      return bTemp;
+  }
 
 //-----/********|--VOID SETUP--|**********/-----//
 void setup() {
 
-//OLED Setup
-if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+//Display Begin
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println(F("SSD1306 allocation failed"));
     for(;;);
-}
+    }
 
   delay(5000);
+  
+//Display Settings 
   display.clearDisplay();
   display.setTextColor(WHITE);
   display.setTextSize(1);
   
+//LED Begin
   pinMode(LED, OUTPUT);
   pinMode(statusLED, OUTPUT);
-  
-  digitalWrite(LED, LOW);
-  digitalWrite(statusLED, LOW);
-  
-  dht.begin();
-  
-  Serial.begin(115200);
+ 
+Serial.begin(115200);
+
+//Wifi Begin
   setup_wifi();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 
-////--| DHT Begin |---------
-    sensors.begin();
+//DHT Sensors Begin
+  sensors.begin();
+  dht.begin();
+
+//Conductivity Sensor Begin
+  pinMode(TdsSensorPin,INPUT);
 
 }
 
 //-----/********|--VOID LOOP--|**********/-----//
 void loop() {
 
+  //Wifi Reconnect
   if (!client.connected()) {
     reconnect();
                 }
-  client.loop();
+    client.loop();
 
-
+  //Time Setting
   now = millis();
 
-////--| Read Sensors every 30 seconds (they are 2 sec delayed) |---------
+  //TDS Sensor
+  // every 40 milliseconds,read the analog value from the ADC
+    static unsigned long analogSampleTimepoint = millis();
+
+    if(millis()-analogSampleTimepoint > 40U){
+     analogSampleTimepoint = millis();
+     analogBuffer[analogBufferIndex] = analogRead(TdsSensorPin);    //read the analog value | store into the buffer
+     analogBufferIndex++;
+     if(analogBufferIndex == SCOUNT) 
+         analogBufferIndex = 0;
+      }   
+   
+    static unsigned long printTimepoint = millis();
+   
+    if(millis()-printTimepoint > 800U){
+      printTimepoint = millis();
+      for(copyIndex=0;copyIndex<SCOUNT;copyIndex++)
+        analogBufferTemp[copyIndex]= analogBuffer[copyIndex];
+      averageVoltage = getMedianNum(analogBufferTemp,SCOUNT) * (float)VREF / 1024.0; // read the analog value more stable by the median filtering algorithm, and convert to voltage value
+      float compensationCoefficient=1.0+0.02*(temperature-25.0);    //temperature compensation formula: fFinalResult(25^C) = fFinalResult(current)/(1.0+0.02*(fTP-25.0));
+      float compensationVolatge=averageVoltage/compensationCoefficient;  //temperature compensation
+      tdsValue=(133.42*compensationVolatge*compensationVolatge*compensationVolatge - 255.86*compensationVolatge*compensationVolatge + 857.39*compensationVolatge)*0.5; //convert voltage value to tds value
+
+////--| Read DHT Sensors every 30 seconds (they are 2 sec delayed) |---------
+//----| Float the values
   if (now - lastMeasure > 5000) { //30 seconds
     lastMeasure = now;
     
@@ -232,51 +301,71 @@ void loop() {
   float temperatureC = sensors.getTempCByIndex(0);
   float temperatureF = sensors.getTempFByIndex(0);
 
-  delay(5000);
+delay(5000);
 
     // Check if any reads failed and exit early (to try again).
     if (isnan(h) || isnan(t) || isnan(f)) {
       Serial.println("Failed to read from DHT sensor!");
       return;
-    }
+      }
                 //Computes temperature values in Celsius
                //float hic = dht.computeHeatIndex(t, h, false);
               //static char temperatureTemp[7];
              //dtostrf(hic, 6, 2, temperatureTemp);
     
-    ////--| DHT Temperature Value |---------
-    float hif = dht.computeHeatIndex(f, h);
-    static char temperatureTemp[7];
-    dtostrf(hif, 6, 2, temperatureTemp);
+////--| DHT Temperature Value |---------
+  float hif = dht.computeHeatIndex(f, h);
+  static char temperatureTemp[7];
+  dtostrf(hif, 6, 2, temperatureTemp);
     
-    ////--| DHT Value |---------
-    static char humidityTemp[7];
-    dtostrf(h, 6, 2, humidityTemp);
+////--| DHT Value |---------
+  static char humidityTemp[7];
+  dtostrf(h, 6, 2, humidityTemp);
 
-    static char OwTemp[7];
-    dtostrf(temperatureF, 6, 2, OwTemp);
+  static char OwTemp[7];
+  dtostrf(temperatureF, 6, 2, OwTemp);
+
 
 
 /**********--------|  Print |---------**********/   
     
-    Serial.print("Topic: room/humidity: ");
+  //Humidity  
     Serial.print("Humidity: ");
     Serial.print(h);
+    Serial.print(" | Topic: room/humidity: ");
       client.publish("room/humidity", humidityTemp);
+
+  //DHT Temperature
     Serial.print("% | Topic: room/DHTemperature: ");
     Serial.print(f);
       client.publish("room/DHTemperature", temperatureTemp);
-    Serial.print(" ºF | Heat Index: ");
-    Serial.print(hif);
+
+    //Serial.print(" ºF | Heat Index: ");
+    //Serial.print(hif);
+    
+  //OW Temperature
     Serial.print(" ºF | OneWire Temp: ");
-    Serial.print(temperatureF);
+    Serial.print(OwTemp);
       client.publish("room/OWTemp", OwTemp);
     Serial.print("ºF | Topic: room/OWTemp ");
     Serial.println("");
 
+  //TDS Sensor
+    Serial.print("| TDS Value: ");
+    Serial.print(tdsValue,0);
+    Serial.println(" ppm");
+
+    //ESP Message
+      client.publish("esp8266/message", "I am sending serial data");
 
 
+/**********--------|  JSON Action  |---------**********/   
 
+String dhtReadings = "{ \"temperature\": \"" + String(temperatureTemp) + "\", \"humidity\" : \"" + String(humidityTemp) + "\"}";
+ 
+    dhtReadings.toCharArray(data, (dhtReadings.length() + 1));
+    client.publish("esp8266/dhtreadings", data);
+    
 /**********--------| Display Print |---------**********/
   display.clearDisplay();
   
@@ -303,8 +392,10 @@ void loop() {
   display.print(h);
   display.print(" %"); 
  
-  
   display.display(); 
 
   }
 } 
+}
+
+
