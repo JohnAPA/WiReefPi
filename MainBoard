@@ -317,15 +317,20 @@ delay(5000);
   float hif = dht.computeHeatIndex(f, h);
   static char temperatureTemp[7];
   dtostrf(hif, 6, 2, temperatureTemp);
-    
+
+////--| Chars for pubsub|---------
 ////--| DHT Value |---------
   static char humidityTemp[7];
   dtostrf(h, 6, 2, humidityTemp);
 
+////--| OW Value |---------
   static char OwTemp[7];
   dtostrf(temperatureF, 6, 2, OwTemp);
 
-
+////--| TDS Sensor Value |------
+float tds = tdsValue;
+static char tdsValue[9];
+  dtostrf(tds, 6, 2, tdsValue);
 
 /**********--------|  Print |---------**********/   
     
@@ -351,12 +356,13 @@ delay(5000);
     Serial.println("");
 
   //TDS Sensor
-    Serial.print("| TDS Value: ");
-    Serial.print(tdsValue,0);
+    Serial.print(" |TDS Value: ");
+    Serial.print(tds,0);
     Serial.println(" ppm");
+      client.publish("room/TDS", tdsValue);
 
     //ESP Message
-      client.publish("esp8266/message", "I am sending serial data");
+      client.publish("esp8266/message", "I am sending serial data & MQTT Data");
 
 
 /**********--------|  JSON Action  |---------**********/   
@@ -395,7 +401,5 @@ String dhtReadings = "{ \"temperature\": \"" + String(temperatureTemp) + "\", \"
   display.display(); 
 
   }
-} 
-}
-
-
+  }
+  }
