@@ -274,13 +274,6 @@ void loop() {
     Serial.print("ºF | Topic: room/OWTemp ");
     Serial.println("");
 
-        
-
-/**********--------| MQTT Publishing |---------**********/
-/**********--------|-----------------|---------**********/
-    
-    
-
 
 
 
